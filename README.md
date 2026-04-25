@@ -15,6 +15,29 @@ An automated novel creation system that expands outlines, plans chapters, writes
                                │ Ollama / Qwen│
                                └──────────────┘
 ```
+```
+
+用户输入前提设定                                                                                                               │
+         ▼
+    ┌─ Planner Agent ─┐  生成结构化大纲(JSON)
+    │  (大纲规划)       │──▶ 用户审核/编辑 ◀─ Human-in-the-loop
+    └─────────────────┘         │
+                                ▼ 确认
+    ┌─ Writer Agent ─────────────────────────────┐
+    │  逐章生成循环:                               │
+    │    ① GraphRAG查询 → 角色关系上下文            │
+    │    ② 拼装记忆(摘要+近文) → LLM Prompt         │
+    │    ③ 流式生成章节文本 (SSE推送前端)            │
+    │    ④ 生成章节摘要 → 更新记忆                   │
+    │    ⑤ Graph Extractor → Neo4j人物图谱          │
+    │    ⑥ 下一章...                               │
+    └────────────────────────────────────────────┘
+         │
+         ▼
+    SQLite(小说/章节) + Neo4j(人物图谱) + SSE(前端实时展示)
+
+Agent：Planner(大纲)、Writer(写作)、Extractor(图谱提取) — 全部用原生Python async实现，不依赖Agent框架。
+```
 
 ## Prerequisites
 
@@ -94,7 +117,7 @@ novel_imagine/
 |---|---|---|
 | `LLM_PROVIDER` | `ollama` | `ollama` or `qwen` |
 | `OLLAMA_BASE_URL` | `http://host.docker.internal:11434/v1` | Ollama API endpoint |
-| `OLLAMA_MODEL` | `qwen2.5:7b` | Ollama model name |
+| `OLLAMA_MODEL` | `qwen3.5:latest` | Ollama model name |
 | `QWEN_API_KEY` | `sk-xxx` | Alibaba Cloud DashScope API key |
 | `QWEN_BASE_URL` | `https://dashscope.aliyuncs.com/compatible-mode/v1` | Qwen API endpoint |
 | `QWEN_MODEL` | `qwen-plus` | Qwen model name |
