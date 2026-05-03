@@ -1,7 +1,7 @@
 import datetime
 from typing import AsyncGenerator
 
-from sqlalchemy import ForeignKey, String, Text, func
+from sqlalchemy import ForeignKey, String, Text, func, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -38,6 +38,7 @@ class Chapter(Base):
     chapter_number: Mapped[int] = mapped_column(default=0)
     title: Mapped[str] = mapped_column(String(256), default="")
     summary: Mapped[str] = mapped_column(Text, default="")
+    structured_summary: Mapped[str] = mapped_column(Text, default="")
     content: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(32), default="pending")
     created_at: Mapped[datetime.datetime] = mapped_column(server_default=func.now())
@@ -52,6 +53,13 @@ async_session_factory = async_sessionmaker(engine, expire_on_commit=False)
 async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Add new columns for existing databases
+        try:
+            await conn.execute(text(
+                "ALTER TABLE chapters ADD COLUMN structured_summary TEXT DEFAULT ''"
+            ))
+        except Exception:
+            pass  # Column already exists
 
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:

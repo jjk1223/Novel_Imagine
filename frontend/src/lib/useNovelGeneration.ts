@@ -9,6 +9,8 @@ import {
   type NovelRequest,
   type OutlineData,
   type LLMProvider,
+  type ReflectEventData,
+  type ReverseOutlineEventData,
 } from "./api";
 
 export type GenerationPhase =
@@ -17,6 +19,7 @@ export type GenerationPhase =
   | "outline_ready"
   | "writing"
   | "extracting"
+  | "reflecting"
   | "done"
   | "error";
 
@@ -31,6 +34,12 @@ export interface ThinkingEntry {
   message: string;
 }
 
+export interface ReflectIssue {
+  chapter: number;
+  issues: string[];
+  reasoning: string;
+}
+
 export interface NovelState {
   phase: GenerationPhase;
   statusMessage: string;
@@ -42,6 +51,7 @@ export interface NovelState {
   thinkingLog: ThinkingEntry[];
   error: string | null;
   provider: LLMProvider;
+  reflectIssues: ReflectIssue[];
 }
 
 const INITIAL_STATE: NovelState = {
@@ -55,6 +65,7 @@ const INITIAL_STATE: NovelState = {
   thinkingLog: [],
   error: null,
   provider: "ollama",
+  reflectIssues: [],
 };
 
 function makeWriteCallbacks(
@@ -76,6 +87,7 @@ function makeWriteCallbacks(
         let phase: GenerationPhase = p.phase;
         if (msg.includes("撰写")) phase = "writing";
         else if (msg.includes("提取")) phase = "extracting";
+        else if (msg.includes("审校") || msg.includes("改写")) phase = "reflecting";
         else if (msg.includes("完成")) phase = "done";
 
         return { ...newState, phase, statusMessage: msg };
@@ -118,6 +130,18 @@ function makeWriteCallbacks(
           statusMessage: p.statusMessage || "生成完成",
         };
       });
+    },
+    onReflect(data: ReflectEventData) {
+      setState((p) => {
+        const currentChapter = p.chapters.length + (p.currentChapterText ? 1 : 0);
+        const newIssues = data.issues_found
+          ? [...p.reflectIssues, { chapter: currentChapter, issues: data.issues, reasoning: data.reasoning }]
+          : p.reflectIssues;
+        return { ...p, reflectIssues: newIssues };
+      });
+    },
+    onReverseOutline(_data: ReverseOutlineEventData) {
+      // Reverse outline info is already captured in thinkingLog events
     },
   };
 }
@@ -199,6 +223,7 @@ export function useNovelGeneration() {
         currentChapterText: "",
         thinkingLog: [],
         error: null,
+        reflectIssues: [],
       };
     });
   }, []);
@@ -219,6 +244,7 @@ export function useNovelGeneration() {
       thinkingLog: [],
       error: null,
       provider: p,
+      reflectIssues: [],
     }));
 
     const controller = startResume(

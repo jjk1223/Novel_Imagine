@@ -70,6 +70,7 @@ async def get_novel(novel_id: int, db: AsyncSession = Depends(get_db_session)):
                 chapter_number=ch.chapter_number,
                 title=ch.title,
                 summary=ch.summary,
+                structured_summary=ch.structured_summary,
                 content=ch.content,
                 status=ch.status,
             )

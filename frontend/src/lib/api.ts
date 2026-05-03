@@ -53,6 +53,7 @@ export interface ResumeRequest {
 export interface GraphNode {
   id: string;
   label: string;
+  type: string;  // "character" | "event" | "item"
   properties: Record<string, string>;
 }
 
@@ -60,6 +61,7 @@ export interface GraphEdge {
   source: string;
   target: string;
   relation: string;
+  type: string;  // "relation" | "participates" | "possesses" | "triggers" | "appears_in"
   properties: Record<string, string>;
 }
 
@@ -82,6 +84,7 @@ export interface ChapterDetail {
   chapter_number: number;
   title: string;
   summary: string;
+  structured_summary: string;
   content: string;
   status: string;
 }
@@ -96,7 +99,18 @@ export interface NovelDetail {
   chapters: ChapterDetail[];
 }
 
-export type SSEEventType = "status" | "text" | "outline" | "graph" | "thinking" | "error" | "done";
+export type SSEEventType = "status" | "text" | "outline" | "graph" | "thinking" | "error" | "done" | "reflect" | "reverse_outline";
+
+export interface ReflectEventData {
+  issues_found: boolean;
+  issues: string[];
+  reasoning: string;
+}
+
+export interface ReverseOutlineEventData {
+  analysis: string;
+  updated_chapters_count: number;
+}
 
 export interface SSECallbacks {
   onStatus?: (msg: string) => void;
@@ -106,6 +120,8 @@ export interface SSECallbacks {
   onThinking?: (msg: string) => void;
   onError?: (msg: string) => void;
   onDone?: () => void;
+  onReflect?: (data: ReflectEventData) => void;
+  onReverseOutline?: (data: ReverseOutlineEventData) => void;
 }
 
 // ── Health ──────────────────────────────────────────────
@@ -226,6 +242,12 @@ function dispatch(event: SSEEventType, raw: string, cb: SSECallbacks) {
       break;
     case "done":
       cb.onDone?.();
+      break;
+    case "reflect":
+      try { cb.onReflect?.(JSON.parse(raw)); } catch { /* skip */ }
+      break;
+    case "reverse_outline":
+      try { cb.onReverseOutline?.(JSON.parse(raw)); } catch { /* skip */ }
       break;
   }
 }

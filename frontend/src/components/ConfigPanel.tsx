@@ -24,7 +24,7 @@ function Spinner() {
   );
 }
 
-const busyPhases: GenerationPhase[] = ["planning", "writing", "extracting"];
+const busyPhases: GenerationPhase[] = ["planning", "writing", "extracting", "reflecting"];
 
 export default function ConfigPanel({ state, onPlan, onSetProvider, onStop, onReset, onShowHistory }: Props) {
   const [premise, setPremise] = useState("");
@@ -40,7 +40,7 @@ export default function ConfigPanel({ state, onPlan, onSetProvider, onStop, onRe
     onPlan({ premise: premise.trim(), genre, num_chapters: numChapters, provider: state.provider });
   }
 
-  const activeChapter = state.phase === "writing" ? state.chapters.length + 1 : null;
+  const activeChapter = state.phase === "writing" || state.phase === "reflecting" ? state.chapters.length + 1 : null;
 
   return (
     <aside className="flex w-72 shrink-0 flex-col border-r border-slate-200 bg-white">
@@ -196,7 +196,7 @@ export default function ConfigPanel({ state, onPlan, onSetProvider, onStop, onRe
       </form>
 
       {/* Chapter progress */}
-      {state.outline && (state.phase === "writing" || state.phase === "extracting" || state.phase === "done") && (
+      {state.outline && (state.phase === "writing" || state.phase === "extracting" || state.phase === "reflecting" || state.phase === "done") && (
         <div className="flex max-h-[45%] flex-col border-t border-slate-100">
           <div className="px-5 py-2">
             <h2 className="text-xs font-semibold text-slate-600">
@@ -208,6 +208,7 @@ export default function ConfigPanel({ state, onPlan, onSetProvider, onStop, onRe
               {state.outline.chapters.map((ch) => {
                 const isDone = state.chapters.some((c) => c.number === ch.chapter_number);
                 const isActive = activeChapter === ch.chapter_number;
+                const hasIssue = state.reflectIssues.some((r) => r.chapter === ch.chapter_number);
                 return (
                   <li
                     key={ch.chapter_number}
@@ -223,7 +224,8 @@ export default function ConfigPanel({ state, onPlan, onSetProvider, onStop, onRe
                       {String(ch.chapter_number).padStart(2, "0")}
                     </span>{" "}
                     {ch.title}
-                    {isDone && <span className="ml-1.5 text-emerald-500">&#10003;</span>}
+                    {isDone && !hasIssue && <span className="ml-1.5 text-emerald-500">&#10003;</span>}
+                    {isDone && hasIssue && <span className="ml-1.5 text-amber-500" title="审校发现问题">&#9888;</span>}
                     {isActive && busy && (
                       <span className="ml-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-500" />
                     )}

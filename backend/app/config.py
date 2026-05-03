@@ -29,6 +29,17 @@ class Settings(BaseSettings):
     # SQLite
     sqlite_url: str = "sqlite+aiosqlite:///./data/novel.db"
 
+    # Memory system
+    recent_full_text_chapters: int = 2  # Tier 3 window size
+
+    # Reflect agent
+    reflect_enabled: bool = True
+    reflect_max_retries: int = 1  # Max rewrite attempts per chapter
+
+    # Reverse outline
+    reverse_outline_enabled: bool = True
+    reverse_outline_interval: int = 5  # Run after every N chapters
+
     @property
     def llm_base_url(self) -> str:
         return self.ollama_base_url if self.llm_provider == "ollama" else self.qwen_base_url

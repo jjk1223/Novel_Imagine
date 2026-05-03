@@ -13,6 +13,8 @@ function tagColor(msg: string): string {
   if (msg.includes("[记忆层]")) return "text-cyan-600";
   if (msg.includes("[摘要]")) return "text-emerald-600";
   if (msg.includes("[完成]")) return "text-indigo-600";
+  if (msg.includes("[Reflect]")) return "text-rose-600";
+  if (msg.includes("[ReverseOutline]")) return "text-orange-600";
   return "text-slate-500";
 }
 

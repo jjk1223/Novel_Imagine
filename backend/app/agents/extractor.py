@@ -1,4 +1,4 @@
-"""Graph Extractor Agent — extracts character entities and relationships from chapter text."""
+"""Graph Extractor Agent — extracts characters, events, items and their relationships from chapter text."""
 
 import json
 import logging
@@ -10,31 +10,47 @@ from app.services.llm import chat, strip_thinking_tags
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """\
-你是一位专业的文本分析师。你的任务是从给定的小说章节文本中提取所有出现的人物角色及其相互关系。
+你是一位专业的文本分析师。你的任务是从给定的小说章节文本中提取三类实体：人物角色、关键事件、重要物品，以及它们之间的关系。
 
 输出要求 — 严格按照以下 JSON 格式，不要输出任何其他内容：
-```json
 {
   "nodes": [
-    {"id": "人物姓名", "label": "人物姓名", "properties": {"role": "主角/配角/反派", "description": "一句话描述"}}
+    {"id": "实体唯一标识", "label": "实体显示名称", "type": "character/event/item", "properties": {...}}
   ],
   "edges": [
-    {"source": "人物A姓名", "target": "人物B姓名", "relation": "关系类型", "properties": {"detail": "关系补充说明"}}
+    {"source": "源实体ID", "target": "目标实体ID", "relation": "关系类型", "type": "relation/participates/possesses/triggers/appears_in", "properties": {...}}
   ]
 }
-```
+
+节点类型及 properties 规范：
+
+1. character（人物）：
+   - properties: {"role": "主角/配角/反派", "description": "一句话描述"}
+
+2. event（关键事件）：
+   - properties: {"time": "发生时间/章节", "location": "地点", "significance": "重要性（高/中/低）", "participants": "参与人物，逗号分隔"}
+
+3. item（重要物品/道具）：
+   - properties: {"category": "武器/信物/法宝/文件/其他", "owner": "持有者", "description": "一句话描述"}
+
+边类型规范：
+- relation: 人物间关系（师徒、父子、恋人、宿敌、盟友、上下级、同门、兄弟等）
+- participates: 人物参与事件（source=人物, target=事件）
+- possesses: 人物持有物品（source=人物, target=物品）
+- triggers: 事件触发事件（source=原因事件, target=结果事件）
+- appears_in: 物品出现在事件中（source=物品, target=事件）
 
 规则：
-- id 和 label 使用人物的完整姓名（保持全文统一）。
-- relation 使用简短的中文关系标签，如：师徒、父子、恋人、宿敌、盟友、上下级、同门、兄弟等。
-- 如果本章没有出现新人物或新关系，对应数组留空。
-- properties.role 只有首次出现的人物才需要填写。
-- 只输出 JSON，不要输出 markdown 代码块标记。
+- id 使用唯一且一致的标识（人物用姓名，事件用简短描述性ID如"第1章_相遇"，物品用名称）
+- 只提取本章中明确出现或提及的实体
+- 如果本章没有某类实体，对应数组留空
+- properties.role 只有首次出现的人物才需要填写
+- 只输出 JSON，不要输出 markdown 代码块标记
 """
 
 
 def _extract_json(text: str) -> dict | None:
-    """Parse JSON from LLM output, stripping <think> blocks and markdown fences."""
+    """Parse JSON from LLM output, stripping thinking blocks and markdown fences."""
     cleaned = strip_thinking_tags(text)
     cleaned = re.sub(r"```(?:json)?\s*", "", cleaned)
     cleaned = cleaned.replace("```", "").strip()
@@ -55,7 +71,7 @@ async def extract_graph(chapter_text: str, chapter_number: int) -> GraphUpdate:
     """Analyse chapter text and return structured graph data."""
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"以下是第{chapter_number}章的内容，请提取人物与关系：\n\n{chapter_text}"},
+        {"role": "user", "content": f"以下是第{chapter_number}章的内容，请提取人物、事件、物品与关系：\n\n{chapter_text}"},
     ]
 
     raw = await chat(messages, temperature=0.2, max_tokens=2048, think=False)
@@ -69,6 +85,7 @@ async def extract_graph(chapter_text: str, chapter_number: int) -> GraphUpdate:
         GraphNode(
             id=n.get("id", n.get("label", "")),
             label=n.get("label", n.get("id", "")),
+            type=n.get("type", "character"),
             properties=n.get("properties", {}),
         )
         for n in parsed.get("nodes", [])
@@ -79,6 +96,7 @@ async def extract_graph(chapter_text: str, chapter_number: int) -> GraphUpdate:
             source=e["source"],
             target=e["target"],
             relation=e.get("relation", "相关"),
+            type=e.get("type", "relation"),
             properties=e.get("properties", {}),
         )
         for e in parsed.get("edges", [])
